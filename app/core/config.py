@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # DeepSeek
     deepseek_api_key: str = ""
-    deepseek_model: str = "deepseek-chat"
+    deepseek_model: str = "deepseek-v4-flash"
     deepseek_base_url: str = "https://api.deepseek.com/v1"
 
     # Firecrawl (premium backend — optional but recommended)
