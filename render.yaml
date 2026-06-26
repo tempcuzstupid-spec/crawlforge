@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: crawlforge
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false  # Manual deploy per user preference
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEEPSEEK_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: FIRECRAWL_API_KEY
+        sync: false  # Set manually in Render dashboard (optional but recommended)
+      - key: FIRECRAWL_BASE_URL
+        value: https://api.firecrawl.dev
+      - key: FIRECRAWL_DEFAULT_BACKEND
+        value: "true"
+      - key: DATABASE_URL
+        sync: false  # Set manually after creating Neon DB
+      - key: PLAYWRIGHT_HEADLESS
+        value: "true"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /ms-playwright
+      - key: MAX_CONCURRENT_BROWSERS
+        value: "2"
+      - key: AGENT_MAX_STEPS
+        value: "20"
+      - key: STEALTH_MODE
+        value: "true"
+      - key: PROXY_LIST
+        sync: false
+      - key: PROXY_ROTATION
+        value: "false"
