@@ -43,3 +43,5 @@ services:
         sync: false
       - key: PROXY_ROTATION
         value: "false"
+      - key: PORT
+        value: "10000"
