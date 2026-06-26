@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+    <h1>🕷️ CrawlForge</h1>
+    <p class="lead">Free AI web crawler. Playwright + Crawl4AI + Browser-Use + Firecrawl + DeepSeek.</p>
+</section>
+
+<section class="grid">
+    <div class="card">
+        <h2>🔍 Crawl URL</h2>
+        <form id="crawl-form">
+            <label>URL</label>
+            <input type="url" name="url" required placeholder="https://example.com/article">
+            <label>Backend</label>
+            <select name="backend">
+                <option value="auto">auto (Firecrawl if configured, else local)</option>
+                <option value="firecrawl">Firecrawl (premium, anti-bot)</option>
+                <option value="local">Local (Playwright + stealth)</option>
+            </select>
+            <label>Custom summary prompt</label>
+            <textarea name="summary_prompt" rows="2">Provide a concise summary in 3-5 bullet points.</textarea>
+            <label class="checkbox">
+                <input type="checkbox" name="summarize" checked> Summarize with AI
+            </label>
+            <button type="submit">Crawl & Summarize</button>
+        </form>
+        <div id="crawl-result" class="result hidden"></div>
+    </div>
+
+    <div class="card">
+        <h2>🤖 AI Agent Task</h2>
+        <form id="agent-form">
+            <label>Task (natural language)</label>
+            <textarea name="task" required rows="3" placeholder="Go to github.com/microsoft/playwright and find the latest release version."></textarea>
+            <label>Starting URL (optional)</label>
+            <input type="url" name="start_url" placeholder="https://...">
+            <label>Max steps</label>
+            <input type="number" name="max_steps" value="15" min="1" max="50">
+            <button type="submit">Run Agent</button>
+        </form>
+        <div id="agent-result" class="result hidden"></div>
+    </div>
+
+    <div class="card">
+        <h2>🗺️ Map Site (Discover URLs)</h2>
+        <form id="map-form">
+            <label>Site URL</label>
+            <input type="url" name="url" required placeholder="https://docs.example.com">
+            <label>Filter (optional substring)</label>
+            <input type="text" name="search" placeholder="e.g. /blog/">
+            <label>Max URLs</label>
+            <input type="number" name="limit" value="100" min="1" max="5000">
+            <label class="checkbox">
+                <input type="checkbox" name="subdomains"> Include subdomains
+            </label>
+            <button type="submit">Discover URLs</button>
+        </form>
+        <div id="map-result" class="result hidden"></div>
+    </div>
+
+    <div class="card">
+        <h2>📦 Batch Scrape</h2>
+        <form id="batch-form">
+            <label>URLs (one per line, max 500)</label>
+            <textarea name="urls" required rows="5" placeholder="https://example.com/a
+https://example.com/b
+https://example.com/c"></textarea>
+            <label class="checkbox">
+                <input type="checkbox" name="summarize" checked> Summarize each page
+            </label>
+            <button type="submit">Batch Scrape</button>
+        </form>
+        <div id="batch-result" class="result hidden"></div>
+    </div>
+
+    <div class="card">
+        <h2>🧠 LLM Extract</h2>
+        <form id="extract-form">
+            <label>URLs (one per line)</label>
+            <textarea name="urls" required rows="3" placeholder="https://example.com/products"></textarea>
+            <label>Extraction prompt</label>
+            <textarea name="prompt" required rows="2" placeholder="Extract product names, prices, and ratings from each page."></textarea>
+            <button type="submit">Extract</button>
+        </form>
+        <div id="extract-result" class="result hidden"></div>
+    </div>
+
+    <div class="card">
+        <h2>🔔 Change Monitor</h2>
+        <form id="monitor-form">
+            <label>URL to watch</label>
+            <input type="url" name="url" required placeholder="https://example.com/pricing">
+            <label>Name (optional)</label>
+            <input type="text" name="name" placeholder="My competitor pricing page">
+            <label>Check interval (seconds, min 300)</label>
+            <input type="number" name="interval" value="86400" min="300" max="2592000">
+            <label class="checkbox">
+                <input type="checkbox" name="summarize" checked> AI-summary each change
+            </label>
+            <button type="submit">Create Monitor</button>
+        </form>
+        <div id="monitor-result" class="result hidden"></div>
+        <h3 style="margin-top:1.5rem">Active Monitors</h3>
+        <div id="monitor-list" class="result">Loading...</div>
+    </div>
+</section>
+
+<section class="card">
+    <h2>📜 Recent Jobs</h2>
+    {% if jobs %}
+    <table class="jobs">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>URL / Task</th>
+                <th>Duration</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td>#{{ job.id }}</td>
+                <td><span class="badge badge-{{ job.type.value }}">{{ job.type.value }}</span></td>
+                <td><span class="badge badge-{{ job.status.value }}">{{ job.status.value }}</span></td>
+                <td class="truncate">
+                    {% if job.url %}<a href="{{ job.url }}" target="_blank">{{ job.url }}</a>
+                    {% else %}{{ job.task or '' }}{% endif %}
+                </td>
+                <td>{{ job.duration_ms or '–' }}{% if job.duration_ms %}ms{% endif %}</td>
+                <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td><a href="/jobs/{{ job.id }}">View →</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No jobs yet. Try one of the forms above!</p>
+    {% endif %}
+</section>
+
+<script>
+const $ = (s) => document.querySelector(s);
+function escapeHtml(s) { return s ? s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : ''; }
+
+async function pollJob(jobId, resultEl, label='Job') {
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = `<p>⏳ ${label} #${jobId} running...</p>`;
+    for (let i = 0; i < 180; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const r = await fetch(`/api/v1/jobs/${jobId}`);
+        if (!r.ok) continue;
+        const job = await r.json();
+        if (job.status === 'completed') {
+            resultEl.innerHTML = `
+                <div class="result-success">
+                    <h3>✅ ${label} #${jobId} completed in ${job.duration_ms}ms</h3>
+                    ${job.summary ? `<h4>Summary</h4><pre>${escapeHtml(job.summary)}</pre>` : ''}
+                    ${job.agent_result ? `<h4>Result</h4><pre>${escapeHtml(job.agent_result)}</pre>` : ''}
+                    <a href="/jobs/${jobId}" class="btn-link">View full details →</a>
+                </div>`;
+            return;
+        }
+        if (job.status === 'failed') {
+            resultEl.innerHTML = `<div class="result-error"><h3>❌ Failed</h3><pre>${escapeHtml(job.error || 'Unknown')}</pre></div>`;
+            return;
+        }
+    }
+    resultEl.innerHTML = `<p>⏱️ Still running after 6 min. Check <a href="/jobs/${jobId}">job page</a>.</p>`;
+}
+
+$('#crawl-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const r = await fetch('/api/v1/crawl', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            url: data.url, summarize: data.summarize === 'on',
+            summary_prompt: data.summary_prompt, backend: data.backend,
+        }),
+    });
+    if (!r.ok) { $('#crawl-result').innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; $('#crawl-result').classList.remove('hidden'); return; }
+    pollJob((await r.json()).job_id, $('#crawl-result'), 'Crawl');
+});
+
+$('#agent-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const body = {task: data.task, max_steps: parseInt(data.max_steps)};
+    if (data.start_url) body.start_url = data.start_url;
+    const r = await fetch('/api/v1/agent', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    if (!r.ok) { $('#agent-result').innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; $('#agent-result').classList.remove('hidden'); return; }
+    pollJob((await r.json()).job_id, $('#agent-result'), 'Agent');
+});
+
+$('#map-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const body = {url: data.url, limit: parseInt(data.limit), include_subdomains: data.subdomains === 'on'};
+    if (data.search) body.search = data.search;
+    const r = await fetch('/api/v1/map', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    const out = $('#map-result');
+    if (!r.ok) { out.innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; out.classList.remove('hidden'); return; }
+    const data2 = await r.json();
+    out.classList.remove('hidden');
+    out.innerHTML = `<h3>${data2.total} URLs discovered</h3><pre style="max-height:400px;overflow:auto">${escapeHtml(data2.discovered_urls.slice(0, 200).join('\n'))}${data2.total > 200 ? '\n... (truncated)' : ''}</pre>`;
+});
+
+$('#batch-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const urls = data.urls.split('\n').map(u => u.trim()).filter(Boolean);
+    const r = await fetch('/api/v1/batch', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({urls, summarize: data.summarize === 'on'}),
+    });
+    if (!r.ok) { $('#batch-result').innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; $('#batch-result').classList.remove('hidden'); return; }
+    pollJob((await r.json()).job_id, $('#batch-result'), 'Batch');
+});
+
+$('#extract-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const urls = data.urls.split('\n').map(u => u.trim()).filter(Boolean);
+    const r = await fetch('/api/v1/extract', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({urls, prompt: data.prompt}),
+    });
+    if (!r.ok) { $('#extract-result').innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; $('#extract-result').classList.remove('hidden'); return; }
+    pollJob((await r.json()).job_id, $('#extract-result'), 'Extract');
+});
+
+async function loadMonitors() {
+    const r = await fetch('/api/v1/monitors');
+    if (!r.ok) return;
+    const list = await r.json();
+    const el = $('#monitor-list');
+    if (!list.length) { el.innerHTML = '<p class="empty">No monitors yet.</p>'; return; }
+    el.innerHTML = list.map(m => `
+        <div style="padding:0.5rem 0;border-bottom:1px solid var(--border)">
+            <strong>${escapeHtml(m.name || m.url)}</strong>
+            <span class="badge badge-${m.status}">${m.status}</span>
+            <br><small style="color:var(--text-dim)">${m.check_count} checks · ${m.change_count} changes · interval ${m.interval_seconds}s · last checked ${m.last_checked_at || 'never'}</small>
+            <br><a href="#" onclick="checkMonitor(${m.id});return false">Check now →</a>
+        </div>`).join('');
+}
+
+$('#monitor-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const r = await fetch('/api/v1/monitors', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            url: data.url, name: data.name || null,
+            interval_seconds: parseInt(data.interval),
+            summarize_changes: data.summarize === 'on',
+        }),
+    });
+    if (!r.ok) { $('#monitor-result').innerHTML = `<div class="result-error">Error ${r.status}: ${await r.text()}</div>`; $('#monitor-result').classList.remove('hidden'); return; }
+    $('#monitor-result').innerHTML = `<div class="result-success"><h3>✅ Monitor created</h3><pre>${escapeHtml(JSON.stringify(await r.json(), null, 2))}</pre></div>`;
+    $('#monitor-result').classList.remove('hidden');
+    loadMonitors();
+});
+
+async function checkMonitor(id) {
+    const r = await fetch(`/api/v1/monitors/${id}/check`, {method: 'POST'});
+    if (!r.ok) { alert('Check failed'); return; }
+    alert('Check queued. Reload page in a few seconds to see results.');
+}
+
+loadMonitors();
+setInterval(loadMonitors, 15000);
+</script>
+{% endblock %}

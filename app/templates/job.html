@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="/" class="back">← Back to dashboard</a>
+
+<div class="card">
+    <div class="job-header">
+        <h1>Job #{{ job.id }}</h1>
+        <span class="badge badge-{{ job.status.value }}">{{ job.status.value }}</span>
+        <span class="badge badge-{{ job.type.value }}">{{ job.type.value }}</span>
+    </div>
+
+    {% if job.url %}
+    <p><strong>URL:</strong> <a href="{{ job.url }}" target="_blank">{{ job.url }}</a></p>
+    {% endif %}
+    {% if job.task %}
+    <p><strong>Task:</strong> {{ job.task }}</p>
+    {% endif %}
+
+    <div class="meta-grid">
+        <div><strong>Created:</strong> {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+        {% if job.duration_ms %}<div><strong>Duration:</strong> {{ job.duration_ms }}ms</div>{% endif %}
+        {% if job.tokens_used %}<div><strong>Tokens:</strong> {{ job.tokens_used }}</div>{% endif %}
+        {% if job.model_used %}<div><strong>Model:</strong> {{ job.model_used }}</div>{% endif %}
+    </div>
+
+    {% if job.error %}
+    <div class="result-error">
+        <h3>❌ Error</h3>
+        <pre>{{ job.error }}</pre>
+    </div>
+    {% endif %}
+
+    {% if job.title %}
+    <h2>{{ job.title }}</h2>
+    {% endif %}
+
+    {% if job.summary %}
+    <h3>📝 AI Summary</h3>
+    <div class="markdown">{{ job.summary }}</div>
+    {% endif %}
+
+    {% if job.agent_result %}
+    <h3>🤖 Agent Result</h3>
+    <div class="markdown">{{ job.agent_result }}</div>
+    {% endif %}
+
+    {% if job.markdown %}
+    <h3>📄 Extracted Markdown</h3>
+    <details>
+        <summary>Show full markdown ({{ job.markdown|length }} chars)</summary>
+        <pre class="markdown-content">{{ job.markdown[:20000] }}{% if job.markdown|length > 20000 %}...{% endif %}</pre>
+    </details>
+    {% endif %}
+
+    {% if job.extracted_json %}
+    <h3>📊 Extracted JSON</h3>
+    <details>
+        <summary>Show JSON</summary>
+        <pre class="markdown-content">{{ job.extracted_json }}</pre>
+    </details>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh if still running
+if ('{{ job.status.value }}' === 'pending' || '{{ job.status.value }}' === 'running') {
+    setTimeout(() => location.reload(), 5000);
+}
+</script>
+{% endblock %}

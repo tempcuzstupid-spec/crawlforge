@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title }}{% endblock %} · CrawlForge</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="brand">🕷️ CrawlForge</a>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/docs">API Docs</a>
+                <a href="https://github.com/" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>CrawlForge v0.1.0 · Playwright · Crawl4AI · Browser-Use · DeepSeek · Neon · Render</p>
+    </footer>
+</body>
+</html>
